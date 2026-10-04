@@ -1,0 +1,95 @@
+// ============================================================
+// HOOK: OUTPUT
+// NPC SPAWN SYSTEM v1.0.0
+// ============================================================
+//
+// This hook runs AFTER the AI has generated its response.
+//
+// Its job is NOT to force an NPC into the story.
+//
+// Its job is to check what REALLY happened.
+//
+// The engine:
+//
+//   1. Detects whether the AI moved the player to another known
+//      location.
+//   2. Checks which configured NPCs were actually mentioned.
+//   3. Records their current location.
+//   4. Records the turn in which they were last seen.
+//   5. Keeps this information for the continuity system.
+//
+// This is what prevents the spawn system from assuming that an
+// NPC appeared merely because it was selected as a possibility.
+// ============================================================
+
+
+const modifier = (text) => {
+
+  // ----------------------------------------------------------
+  // Safety check.
+  // ----------------------------------------------------------
+
+  if (
+    typeof NPCSpawn === "undefined"
+  ) {
+
+    return {
+      text
+    };
+  }
+
+
+  const turn =
+    (
+      typeof info !== "undefined" &&
+      info &&
+      Number.isFinite(
+        Number(
+          info.actionCount
+        )
+      )
+    )
+      ? Number(
+          info.actionCount
+        )
+      : (
+          Array.isArray(history)
+            ? history.length
+            : 0
+        );
+
+
+  // ----------------------------------------------------------
+  // Give the generated AI output to the shared engine.
+  //
+  // The output itself is NOT changed.
+  //
+  // The engine only updates its hidden state.
+  // ----------------------------------------------------------
+
+  NPCSpawn.handleOutput(
+    String(text || ""),
+    state,
+    history,
+    turn
+  );
+
+
+  // ----------------------------------------------------------
+  // IMPORTANT:
+  //
+  // Return the AI's original output unchanged.
+  //
+  // The player should never see the internal NPC Spawn
+  // instructions used by the system.
+  // ----------------------------------------------------------
+
+  return {
+    text
+  };
+};
+
+
+// DO NOT REMOVE THIS LINE.
+// AI Dungeon requires modifier(text) in non-Library hooks.
+modifier(text);
