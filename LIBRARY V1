@@ -1,253 +1,118 @@
-// ============================================================
-// HOOK: LIBRARY
-// NPC SPAWN SYSTEM v1.0.0
-// ============================================================
-//
-// ⚠️ THIS IS THE SHARED LIBRARY.
-//
-// This block contains:
-//
-//   1. The CREATOR CONFIGURATION
-//   2. The NPC Spawn Engine
-//   3. Location detection
-//   4. Spawn probability
-//   5. Character selection
-//   6. NPC continuity / anti-teleport protection
-//   7. Story Card support
-//   8. Output presence tracking
-//
-// IMPORTANT:
-//
-// Unlike Input / Context / Output, the Library does NOT need
-// "modifier(text)" at the end.
-//
-// ------------------------------------------------------------
-// 👑 CREATOR RULE
-// ------------------------------------------------------------
-//
-// You only need to edit the CREATOR CONFIGURATION section.
-//
-// The rest of this Library is the engine.
-//
-// DO NOT edit the engine unless you are intentionally modifying
-// the script itself.
-// ============================================================
+/*
+===========================================================
+NPC SPAWN SYSTEM
+Version: 1.0.1
+
+HOOK: LIBRARY
+
+WHAT YOU EDIT:
+Only edit the SPAWN_CONFIG section below.
+
+Each location has:
+- name
+- aliases
+- firstEntryChance
+- revisitChance
+- charactersPerSpawn
+- characters
+
+IMPORTANT:
+- The location "name" is automatically treated as a trigger.
+- Add aliases for other ways the player may refer to the same place.
+- Chances are percentages from 0 to 100.
+- Character numbers are RELATIVE WEIGHTS, not percentages.
+- charactersPerSpawn = 1 means one NPC is selected.
+- charactersPerSpawn = 2 means two different NPCs can be selected.
+===========================================================
+*/
 
 
-
-// ============================================================
-// ============================================================
-//                  👑 CREATOR CONFIGURATION
-// ============================================================
-// ============================================================
-//
-// THIS is the part you are supposed to edit.
-//
-// The easiest way to use this system is:
-//
-//   1. Keep the DEMO location so you can test the system.
-//   2. Copy the TEMPLATE location at the bottom.
-//   3. Paste the copy underneath your other locations.
-//   4. Change the location name.
-//   5. Change the aliases.
-//   6. Change the chances.
-//   7. Change the character names and their weights.
-//
-// THAT IS ALL YOU NEED TO DO.
-//
-// ------------------------------------------------------------
-// ⚠️ VERY IMPORTANT ABOUT CHARACTER NAMES
-// ------------------------------------------------------------
-//
-// Write the character name that the AI is most likely to use
-// when referring to that character.
-//
-// Ideally, this should match one of the character's Story Card
-// triggers.
-//
-// Example:
-//
-//     characters: {
-//       "Mira": 60
-//     }
-//
-// is preferable to:
-//
-//     characters: {
-//       "Mira the Innkeeper": 60
-//     }
-//
-// if the AI normally calls her simply "Mira".
-//
-// ------------------------------------------------------------
-// ⚠️ VERY IMPORTANT ABOUT ALIASES
-// ------------------------------------------------------------
-//
-// The main "name" of the location is AUTOMATICALLY treated as
-// one of its triggers.
-//
-// You only need to put additional ways of referring to the
-// same place inside "aliases".
-//
-// Example:
-//
-//     name: "Old Harbor"
-//
-//     aliases: [
-//       "the Old Harbor",
-//       "Old Harbor docks",
-//       "the harbor",
-//       "the docks"
-//     ]
-//
-// This makes the system recognize all of those as the SAME
-// location.
-//
-// Try to use aliases that are distinctive enough that they
-// will not accidentally match unrelated text.
-//
-// ------------------------------------------------------------
-// 🎲 ABOUT LOCATION PROBABILITY
-// ------------------------------------------------------------
-//
-// There are TWO location probabilities:
-//
-//     firstEntryChance
-//
-//         Chance that the system will attempt an NPC spawn
-//         when the player enters the location for the first time.
-//
-//     revisitChance
-//
-//         Chance that the system will attempt an NPC spawn
-//         when the player returns to the location later.
-//
-// Both values are literal percentages:
-//
-//     0   = 0%
-//     25  = 25%
-//     50  = 50%
-//     100 = 100%
-//
-// ------------------------------------------------------------
-// 🎲 ABOUT CHARACTER PROBABILITY
-// ------------------------------------------------------------
-//
-// Character numbers are RELATIVE WEIGHTS.
-//
-// They determine who is selected if the location spawn
-// actually happens.
-//
-// Example:
-//
-//     characters: {
-//       "Mira": 60,
-//       "Bram": 30,
-//       "Nell": 10
-//     }
-//
-// You can think of that as:
-//
-//     Mira  = 60
-//     Bram  = 30
-//     Nell  = 10
-//
-// So Mira is twice as likely as Bram, and Bram is three times
-// as likely as Nell.
-//
-// The numbers do NOT have to add up to 100.
-//
-// These are equivalent:
-//
-//     60 / 30 / 10
-//
-//     6 / 3 / 1
-//
-//     600 / 300 / 100
-//
-// If making the numbers add up to 100 feels easier, do it.
-// That is perfectly fine.
-//
-// ------------------------------------------------------------
-// 👥 ABOUT charactersPerSpawn
-// ------------------------------------------------------------
-//
-// This determines how many DIFFERENT characters the spawn
-// event can select.
-//
-//     1 = one character
-//     2 = two characters
-//     3 = three characters
-//
-// For most locations, 1 is recommended.
-//
-// If you set this to 2, the engine selects two different
-// characters according to their weights.
-//
-// ------------------------------------------------------------
-// ✏️ QUICK EXAMPLE
-// ------------------------------------------------------------
-//
-//     firstEntryChance: 40,
-//     revisitChance: 15,
-//
-//     charactersPerSpawn: 1,
-//
-//     characters: {
-//       "Mira": 60,
-//       "Bram": 30,
-//       "Nell": 10
-//     }
-//
-// Means:
-//
-//   → First time in the location: 40% chance of a spawn.
-//   → Returning later: 15% chance of a spawn.
-//   → One character will be selected.
-//   → Mira is the most likely.
-//   → Bram is half as likely as Mira.
-//   → Nell is the least likely.
-//
-// ============================================================
-
+/* ========================================================
+   CREATOR CONFIGURATION
+   ======================================================== */
 
 const SPAWN_CONFIG = {
 
+  /*
+  ----------------------------------------------------------
+  GENERAL SETTINGS
+  ----------------------------------------------------------
+  */
+
+  debug: false,
+
+  /*
+  Number of turns during which a recently seen character
+  is protected from being automatically spawned somewhere
+  else.
+
+  Example:
+  3 = the character will normally not be auto-spawned
+  at another location for the next 3 turns.
+  */
+
+  continuityLockTurns: 3,
+
+  /*
+  If true, when a character is selected, the engine tries
+  to find that character's existing Story Card and inject
+  its entry into the generation context.
+
+  This means you do NOT have to duplicate the character's
+  full description inside this system.
+  */
+
+  injectSelectedStoryCards: true,
+
+  /*
+  Maximum number of characters from a Story Card that will
+  be injected for one selected NPC.
+
+  This prevents an unusually large Story Card from flooding
+  the generation context.
+  */
+
+  maxStoryCardCharsPerCharacter: 900,
+
+
+  /*
+  ----------------------------------------------------------
+  LOCATIONS
+  ----------------------------------------------------------
+
+  COPY ONE COMPLETE LOCATION OBJECT if you want to add
+  another location.
+
+  Paste the copy BELOW the previous location object and
+  change its values.
+
+  ONLY CHANGE:
+  1. name
+  2. aliases
+  3. firstEntryChance
+  4. revisitChance
+  5. charactersPerSpawn
+  6. characters
+  ----------------------------------------------------------
+  */
+
   locations: [
 
+    /*
+    ========================================================
+    DEMO LOCATION
+    ========================================================
 
-    // ========================================================
-    // 🧪 DEMO LOCATION
-    // --------------------------------------------------------
-    // This is the ONE real example included with the system.
-    //
-    // Keep it while testing your scenario.
-    //
-    // The characters here are intentionally fictional and
-    // unrelated to any of your scenarios.
-    //
-    // For the demo to have full character information, create
-    // Story Cards for these characters in your scenario:
-    //
-    //     Mira
-    //     Bram
-    //     Nell
-    //
-    // The script can still work without those Story Cards,
-    // but it will have less information available about them.
-    // ========================================================
+    This is the only pre-made example.
+
+    It is fully functional and can be used to test whether
+    the system is working correctly.
+    ========================================================
+    */
 
     {
       name: "Lantern & Fox Inn",
 
-      // ------------------------------------------------------
-      // ALIASES
-      // ------------------------------------------------------
-      //
-      // The main name above is already a trigger.
-      // These are additional ways the AI/player may refer
-      // to the same place.
-      //
       aliases: [
         "the Lantern & Fox Inn",
         "the Lantern and Fox",
@@ -256,86 +121,65 @@ const SPAWN_CONFIG = {
         "the tavern"
       ],
 
-      // ------------------------------------------------------
-      // FIRST VISIT
-      // ------------------------------------------------------
-      //
-      // 70 means:
-      // 70% chance of attempting an NPC spawn the first time
-      // the player enters this location.
-      //
+      /*
+      Chance when the player enters this location for the
+      FIRST TIME.
+      */
+
       firstEntryChance: 70,
 
-      // ------------------------------------------------------
-      // RETURN VISIT
-      // ------------------------------------------------------
-      //
-      // 25 means:
-      // 25% chance of attempting an NPC spawn when the player
-      // returns to this location later.
-      //
+      /*
+      Chance when the player returns to this location
+      AFTER having visited it before.
+      */
+
       revisitChance: 25,
 
-      // ------------------------------------------------------
-      // NUMBER OF CHARACTERS
-      // ------------------------------------------------------
-      //
-      // The demo normally spawns ONE character.
-      //
+      /*
+      Maximum number of characters selected in one spawn.
+
+      1 = one NPC
+      2 = two different NPCs
+      3 = three different NPCs
+      */
+
       charactersPerSpawn: 1,
 
-      // ------------------------------------------------------
-      // CHARACTERS
-      // ------------------------------------------------------
-      //
-      // These numbers are RELATIVE WEIGHTS.
-      //
-      // Mira is the most common.
-      // Bram is less common.
-      // Nell is the least common.
-      //
-      characters: {
+      /*
+      CHARACTER WEIGHTS
 
+      These are RELATIVE WEIGHTS.
+
+      60 / 30 / 10 means roughly:
+      Mira = most likely
+      Bram = less likely
+      Nell = least likely
+
+      The values do NOT need to add up to 100.
+
+      Example:
+      6 / 3 / 1 gives approximately the same result as
+      60 / 30 / 10.
+      */
+
+      characters: {
         "Mira": 60,
         "Bram": 30,
         "Nell": 10
-
       }
     },
 
 
-    // ========================================================
-    // ✏️ COPY THIS TEMPLATE TO CREATE YOUR OWN LOCATION
-    // ========================================================
-    //
-    // THIS IS NOT ANOTHER SCENARIO EXAMPLE.
-    //
-    // It is simply the blank template you should copy.
-    //
-    // IMPORTANT:
-    //
-    // You can copy the ENTIRE block below and paste it above
-    // the final closing "]" of the locations array.
-    //
-    // Leave the comma after the block.
-    //
-    // JavaScript allows that comma, so you do NOT need to
-    // worry about changing commas when copying locations.
-    //
-    // Then replace:
-    //
-    //     YOUR LOCATION NAME
-    //     aliases
-    //     firstEntryChance
-    //     revisitChance
-    //     charactersPerSpawn
-    //     Character One
-    //     Character Two
-    //     Character Three
-    //
-    // You can add or remove characters as necessary.
-    //
-    // ========================================================
+    /*
+    ========================================================
+    COPY THIS TEMPLATE TO CREATE ANOTHER LOCATION
+    ========================================================
+
+    Do not leave "YOUR LOCATION NAME" unchanged.
+
+    Replace every placeholder with your own information.
+    ========================================================
+    */
 
     {
       name: "YOUR LOCATION NAME",
@@ -347,220 +191,136 @@ const SPAWN_CONFIG = {
       ],
 
       firstEntryChance: 25,
+
       revisitChance: 10,
 
       charactersPerSpawn: 1,
 
       characters: {
-
         "Character One": 60,
         "Character Two": 30,
         "Character Three": 10
-
       }
     }
 
-    // ========================================================
-    // END OF TEMPLATE
-    // ========================================================
-    //
-    // After adding your own location, simply copy the template
-    // again to create another one.
-    //
-    // Example structure:
-    //
-    //     locations: [
-    //
-    //       { LOCATION 1 },
-    //
-    //       { LOCATION 2 },
-    //
-    //       { LOCATION 3 }
-    //
-    //     ]
-    //
-    // You do not need to modify the engine below.
-    // ========================================================
-
   ]
-
 };
 
 
-// ============================================================
-// ============================================================
-//             ⚙️ END OF CREATOR CONFIGURATION
-// ============================================================
-// ============================================================
-//
-// 🛑 STOP EDITING HERE.
-//
-// Everything below this line is the actual engine.
-//
-// You do NOT need to edit this part to configure the system.
-//
-// ============================================================
+/* ========================================================
+   INTERNAL STATE
+   ======================================================== */
 
+function NPCSpawn_CreateDefaultState() {
 
+  return {
+    initialized: true,
 
-const NPC_SPAWN_ENGINE_SETTINGS = {
+    currentLocation: null,
 
-  // ----------------------------------------------------------
-  // 🚫 DO NOT TOUCH UNLESS YOU ARE TESTING THE SCRIPT
-  // ----------------------------------------------------------
-  //
-  // true  = additional information is written to the script
-  //         console during testing.
-  //
-  // false = normal silent operation.
-  //
-  debug: false,
+    visitedLocations: {},
 
+    entryPending: false,
 
-  // ----------------------------------------------------------
-  // 🚫 DO NOT TOUCH UNLESS YOU KNOW WHAT YOU ARE DOING
-  // ----------------------------------------------------------
-  //
-  // Number of turns a character should normally be prevented
-  // from being automatically spawned in a DIFFERENT location
-  // after being seen somewhere else.
-  //
-  // This prevents obvious "teleportation".
-  //
-  continuityLockTurns: 3,
+    lastEntry: null,
 
+    pendingSpawn: null,
 
-  // ----------------------------------------------------------
-  // 📚 STORY CARD SUPPORT
-  // ----------------------------------------------------------
-  //
-  // AI Dungeon's normal Story Card system activates cards when
-  // their triggers appear in the player's input or story output.
-  //
-  // Because this script can select an NPC BEFORE the AI writes
-  // the output, the selected character's Story Card may not
-  // have been triggered yet.
-  //
-  // To solve that, the script can directly add the selected
-  // Story Card's entry to the model context for that generation.
-  //
-  // This is only done for the NPCs actually selected by the
-  // spawn system.
-  //
-  // This keeps the system much more reliable without putting
-  // every character in the context all the time.
-  //
-  injectSelectedStoryCards: true,
+    recentPresence: {},
 
+    lastProcessedInput: "",
 
-  // ----------------------------------------------------------
-  // MAXIMUM STORY CARD TEXT
-  // ----------------------------------------------------------
-  //
-  // If a selected Story Card is extremely long, only this many
-  // characters will be injected for that generation.
-  //
-  // This protects the context from a gigantic accidental card.
-  //
-  maxStoryCardCharsPerCharacter: 900
-
-};
-
-
-
-// ============================================================
-// INTERNAL STATE
-// ============================================================
-
-function NPCSpawn_EnsureState(gameState) {
-
-  if (!gameState.npcSpawn ||
-      typeof gameState.npcSpawn !== "object") {
-
-    gameState.npcSpawn = {};
-  }
-
-  const data = gameState.npcSpawn;
-
-
-  if (!Array.isArray(data.visitedLocations)) {
-    data.visitedLocations = [];
-  }
-
-
-  if (!data.characterLocations ||
-      typeof data.characterLocations !== "object") {
-
-    data.characterLocations = {};
-  }
-
-
-  if (!data.lastAppearanceTurn ||
-      typeof data.lastAppearanceTurn !== "object") {
-
-    data.lastAppearanceTurn = {};
-  }
-
-
-  if (!data.currentLocation ||
-      typeof data.currentLocation !== "string") {
-
-    data.currentLocation = "";
-  }
-
-
-  if (!data.entryPending ||
-      typeof data.entryPending !== "boolean") {
-
-    data.entryPending = false;
-  }
-
-
-  if (!data.lastEntry ||
-      typeof data.lastEntry !== "object") {
-
-    data.lastEntry = null;
-  }
-
-
-  if (!data.pendingSpawn ||
-      typeof data.pendingSpawn !== "object") {
-
-    data.pendingSpawn = null;
-  }
-
-
-  if (typeof data.lastInput !== "string") {
-    data.lastInput = "";
-  }
-
-
-  return data;
+    lastProcessedOutput: ""
+  };
 }
 
 
+function NPCSpawn_GetState(state) {
 
-// ============================================================
-// BASIC HELPERS
-// ============================================================
+  if (
+    !state ||
+    typeof state !== "object"
+  ) {
+    return null;
+  }
+
+  if (
+    !state.npcSpawn ||
+    typeof state.npcSpawn !== "object"
+  ) {
+    state.npcSpawn =
+      NPCSpawn_CreateDefaultState();
+  }
+
+  return state.npcSpawn;
+}
+
+
+/* ========================================================
+   DEBUG
+   ======================================================== */
+
+function NPCSpawn_Debug(message) {
+
+  if (
+    SPAWN_CONFIG.debug &&
+    typeof console !== "undefined" &&
+    console &&
+    typeof console.log === "function"
+  ) {
+
+    console.log(
+      "[NPC Spawn] " +
+      String(message)
+    );
+  }
+}
+
+
+/* ========================================================
+   NORMALIZATION
+   ======================================================== */
 
 function NPCSpawn_Normalize(value) {
 
-  return String(value || "")
+  return String(
+    value || ""
+  )
     .toLowerCase()
-    .replace(/’/g, "'")
-    .replace(/\s+/g, " ")
+    .normalize("NFD")
+    .replace(
+      /[\u0300-\u036f]/g,
+      ""
+    )
+    .replace(
+      /[“”"']/g,
+      ""
+    )
+    .replace(
+      /[^a-z0-9áéíóúüñ&]+/gi,
+      " "
+    )
+    .replace(
+      /\s+/g,
+      " "
+    )
     .trim();
 }
 
 
-function NPCSpawn_ClampChance(value, fallback) {
+/* ========================================================
+   NUMBER HELPERS
+   ======================================================== */
+
+function NPCSpawn_ClampChance(value) {
 
   const number =
     Number(value);
 
-  if (!Number.isFinite(number)) {
-    return fallback;
+  if (
+    !Number.isFinite(number)
+  ) {
+    return 0;
   }
 
   return Math.max(
@@ -573,148 +333,225 @@ function NPCSpawn_ClampChance(value, fallback) {
 }
 
 
-function NPCSpawn_PositiveNumber(value, fallback) {
+function NPCSpawn_ClampCount(value) {
 
   const number =
-    Number(value);
+    Math.floor(
+      Number(value)
+    );
 
   if (
     !Number.isFinite(number) ||
-    number <= 0
+    number < 1
   ) {
-    return fallback;
+    return 1;
   }
 
   return number;
 }
 
 
-function NPCSpawn_PositiveInteger(value, fallback) {
-
-  const number =
-    Number(value);
-
-  if (
-    !Number.isFinite(number) ||
-    number < 1
-  ) {
-    return fallback;
-  }
-
-  return Math.max(
-    1,
-    Math.floor(number)
-  );
-}
-
+/* ========================================================
+   CONFIG VALIDATION
+   ======================================================== */
 
 function NPCSpawn_IsPlaceholder(value) {
 
-  const normalized =
-    NPCSpawn_Normalize(value);
+  const source =
+    String(
+      value || ""
+    )
+      .toLowerCase()
+      .trim();
 
-  if (!normalized) {
+  if (!source) {
     return true;
   }
 
-  return (
-    normalized.indexOf("your location name") !== -1 ||
-    normalized.indexOf("write location name") !== -1 ||
-    normalized.indexOf("character one") !== -1 ||
-    normalized.indexOf("character two") !== -1 ||
-    normalized.indexOf("character three") !== -1 ||
-    normalized.indexOf("another way to name") !== -1 ||
-    normalized.indexOf("another possible name") !== -1
-  );
-}
-
-
-function NPCSpawn_Debug(message) {
+  if (
+    source.indexOf(
+      "your location name"
+    ) !== -1
+  ) {
+    return true;
+  }
 
   if (
-    NPC_SPAWN_ENGINE_SETTINGS.debug &&
-    typeof log === "function"
+    source.indexOf(
+      "another way to name this place"
+    ) !== -1
   ) {
-
-    log(
-      "[NPC Spawn] " +
-      String(message || "")
-    );
+    return true;
   }
+
+  if (
+    source.indexOf(
+      "another possible name"
+    ) !== -1
+  ) {
+    return true;
+  }
+
+  if (
+    source.indexOf(
+      "a common name for this location"
+    ) !== -1
+  ) {
+    return true;
+  }
+
+  if (
+    source.indexOf(
+      "character one"
+    ) !== -1
+  ) {
+    return true;
+  }
+
+  if (
+    source.indexOf(
+      "character two"
+    ) !== -1
+  ) {
+    return true;
+  }
+
+  if (
+    source.indexOf(
+      "character three"
+    ) !== -1
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 
+function NPCSpawn_ValidateLocation(location) {
 
-// ============================================================
-// LOCATION CONFIGURATION HELPERS
-// ============================================================
+  if (
+    !location ||
+    typeof location !== "object"
+  ) {
+    return false;
+  }
+
+  if (
+    NPCSpawn_IsPlaceholder(
+      location.name
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    !Array.isArray(
+      location.characters
+    ) &&
+    (
+      !location.characters ||
+      typeof location.characters !== "object"
+    )
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+
+/* ========================================================
+   LOCATION HELPERS
+   ======================================================== */
 
 function NPCSpawn_GetValidLocations() {
 
-  if (
-    !SPAWN_CONFIG ||
-    !Array.isArray(
+  const locations =
+    Array.isArray(
       SPAWN_CONFIG.locations
     )
+      ? SPAWN_CONFIG.locations
+      : [];
+
+  const result = [];
+
+  for (
+    const location
+    of locations
   ) {
 
-    return [];
+    if (
+      NPCSpawn_ValidateLocation(
+        location
+      )
+    ) {
+
+      result.push(
+        location
+      );
+    }
   }
 
-
-  return SPAWN_CONFIG.locations
-    .filter(location => {
-
-      if (
-        !location ||
-        typeof location !== "object"
-      ) {
-
-        return false;
-      }
-
-
-      if (
-        typeof location.name !== "string" ||
-        !location.name.trim()
-      ) {
-
-        return false;
-      }
-
-
-      if (
-        NPCSpawn_IsPlaceholder(
-          location.name
-        )
-      ) {
-
-        return false;
-      }
-
-
-      if (
-        !location.characters ||
-        typeof location.characters !== "object"
-      ) {
-
-        return false;
-      }
-
-
-      return true;
-    });
+  return result;
 }
 
 
-function NPCSpawn_GetAliases(location) {
+function NPCSpawn_GetLocationByName(
+  name
+) {
 
-  const aliases = [
-    location.name
-  ];
+  const target =
+    NPCSpawn_Normalize(
+      name
+    );
 
+  if (!target) {
+    return null;
+  }
+
+  const locations =
+    NPCSpawn_GetValidLocations();
+
+  for (
+    const location
+    of locations
+  ) {
+
+    if (
+      NPCSpawn_Normalize(
+        location.name
+      ) === target
+    ) {
+
+      return location;
+    }
+  }
+
+  return null;
+}
+
+
+function NPCSpawn_GetAliases(
+  location
+) {
+
+  const result = [];
 
   if (
+    location &&
+    location.name
+  ) {
+
+    result.push(
+      NPCSpawn_Normalize(
+        location.name
+      )
+    );
+  }
+
+  if (
+    location &&
     Array.isArray(
       location.aliases
     )
@@ -725,75 +562,117 @@ function NPCSpawn_GetAliases(location) {
       of location.aliases
     ) {
 
+      const normalized =
+        NPCSpawn_Normalize(
+          alias
+        );
+
       if (
-        typeof alias === "string" &&
-        alias.trim()
+        normalized &&
+        result.indexOf(
+          normalized
+        ) === -1
       ) {
 
-        aliases.push(alias);
+        result.push(
+          normalized
+        );
       }
     }
   }
 
+  return result;
+}
 
-  return [
-    ...new Set(
-      aliases.map(
-        alias =>
-          NPCSpawn_Normalize(alias)
-      )
-    )
-  ]
-  .filter(Boolean)
-  .sort(
-    (a, b) =>
-      b.length - a.length
+
+/* ========================================================
+   REGEX ESCAPING
+   ======================================================== */
+
+/*
+IMPORTANT FIX:
+This is the normal JavaScript regex syntax.
+
+The previous version could become invalid if the square
+brackets were converted into HTML entities.
+*/
+
+function NPCSpawn_EscapeRegExp(
+  value
+) {
+
+  return String(
+    value || ""
+  ).replace(
+    /[.*+?^${}()|[\]\\]/g,
+    "\\$&"
   );
 }
 
 
-function NPCSpawn_GetLocationByName(name) {
+/* ========================================================
+   PHRASE MATCHING
+   ======================================================== */
 
-  const target =
-    NPCSpawn_Normalize(name);
+function NPCSpawn_ContainsPhrase(
+  source,
+  target
+) {
 
-  const locations =
-    NPCSpawn_GetValidLocations();
+  const normalizedSource =
+    NPCSpawn_Normalize(
+      source
+    );
 
+  const normalizedTarget =
+    NPCSpawn_Normalize(
+      target
+    );
 
-  return (
-    locations.find(
-      location =>
-        NPCSpawn_Normalize(
-          location.name
-        ) === target
-    ) || null
+  if (
+    !normalizedSource ||
+    !normalizedTarget
+  ) {
+    return false;
+  }
+
+  const pattern =
+    new RegExp(
+      "(^|[^a-z0-9])" +
+      NPCSpawn_EscapeRegExp(
+        normalizedTarget
+      ) +
+      "($|[^a-z0-9])",
+      "i"
+    );
+
+  return pattern.test(
+    normalizedSource
   );
 }
 
 
+/* ========================================================
+   LOCATION MATCHING
+   ======================================================== */
 
-// ============================================================
-// TEXT MATCHING
-// ============================================================
-
-function NPCSpawn_FindLocationMatches(text) {
+function NPCSpawn_FindLocationMatches(
+  text
+) {
 
   const source =
-    NPCSpawn_Normalize(text);
-
+    NPCSpawn_Normalize(
+      text
+    );
 
   if (!source) {
     return [];
   }
 
+  const matches = [];
 
   const locations =
     NPCSpawn_GetValidLocations();
-
-
-  const matches = [];
-
 
   for (
     const location
@@ -805,72 +684,48 @@ function NPCSpawn_FindLocationMatches(text) {
         location
       );
 
-
     for (
       const alias
       of aliases
     ) {
 
-      let startIndex =
-        source.indexOf(alias);
-
-
-      while (
-        startIndex !== -1
+      if (
+        source.indexOf(
+          alias
+        ) !== -1
       ) {
 
-        matches.push({
-          location,
-          alias,
-          index: startIndex
-        });
-
-
-        startIndex =
-          source.indexOf(
+        matches.push(
+          {
+            location,
             alias,
-            startIndex +
-            alias.length
-          );
+            index:
+              source.indexOf(
+                alias
+              )
+          }
+        );
+
+        break;
       }
     }
   }
-
-
-  matches.sort(
-    (a, b) => {
-
-      if (
-        b.index !==
-        a.index
-      ) {
-
-        return (
-          b.index -
-          a.index
-        );
-      }
-
-
-      return (
-        b.alias.length -
-        a.alias.length
-      );
-    }
-  );
-
 
   return matches;
 }
 
 
+/* ========================================================
+   MOVEMENT DETECTION
+   ======================================================== */
 
-// ------------------------------------------------------------
-// Movement / location wording detection.
-//
-// This is deliberately broad so that the system can understand
-// common English and Spanish movement wording.
-// ------------------------------------------------------------
+/*
+IMPORTANT FIX:
+The old multiline regex literal was invalid JavaScript.
+
+This version keeps the same idea but places the regex on
+one line so JavaScript can parse it correctly.
+*/
 
 function NPCSpawn_HasLocationCue(
   source,
@@ -884,15 +739,13 @@ function NPCSpawn_HasLocationCue(
       index - 100
     );
 
-
   const end =
     Math.min(
       source.length,
       index +
-      aliasLength +
-      100
+        aliasLength +
+        100
     );
-
 
   const windowText =
     source.slice(
@@ -900,92 +753,8 @@ function NPCSpawn_HasLocationCue(
       end
     );
 
-
   const movementPattern =
-    /\b(
-      go|
-      goes|
-      went|
-      going|
-      walk|
-      walks|
-      walked|
-      walking|
-      enter|
-      enters|
-      entered|
-      entering|
-      head|
-      heads|
-      headed|
-      heading|
-      return|
-      returns|
-      returned|
-      returning|
-      arrive|
-      arrives|
-      arrived|
-      arriving|
-      reach|
-      reaches|
-      reached|
-      reaching|
-      travel|
-      travels|
-      traveled|
-      travelling|
-      move|
-      moves|
-      moved|
-      moving|
-      leave|
-      leaves|
-      left|
-      leaving|
-      depart|
-      departs|
-      departed|
-      departing|
-      visit|
-      visits|
-      visited|
-      visiting|
-      back to|
-      into|
-      inside|
-      outside|
-      at|
-      near|
-      ir|
-      voy|
-      va|
-      vamos|
-      fui|
-      ir a|
-      entrar|
-      entro|
-      entra|
-      entrar en|
-      volver|
-      vuelvo|
-      vuelve|
-      volver a|
-      llegar|
-      llego|
-      llega|
-      llegar a|
-      visitar|
-      visito|
-      visita|
-      hacia|
-      dentro|
-      salir|
-      salgo|
-      sale|
-      saliendo
-    )\b/i;
-
+    /\b(go|goes|went|going|walk|walks|walked|walking|enter|enters|entered|entering|head|heads|headed|heading|return|returns|returned|returning|arrive|arrives|arrived|arriving|reach|reaches|reached|reaching|travel|travels|traveled|travelling|move|moves|moved|moving|leave|leaves|left|leaving|depart|departs|departed|departing|visit|visits|visited|visiting|back to|into|inside|outside|at|near|ir|voy|va|vamos|fui|ir a|entrar|entro|entra|entrar en|volver|vuelvo|vuelve|volver a|llegar|llego|llega|llegar a|visitar|visito|visita|hacia|dentro|salir|salgo|sale|saliendo)\b/i;
 
   if (
     movementPattern.test(
@@ -996,18 +765,6 @@ function NPCSpawn_HasLocationCue(
     return true;
   }
 
-
-  // A very simple command containing only the location name
-  // should also count as an intentional selection.
-  //
-  // Example:
-  //
-  //     Lantern & Fox Inn
-  //
-  // or:
-  //
-  //     the old church
-  //
   if (
     windowText ===
     source.trim()
@@ -1016,176 +773,21 @@ function NPCSpawn_HasLocationCue(
     return true;
   }
 
-
   return false;
 }
 
 
-function NPCSpawn_FindLocationFromText(
-  text,
-  allowLooseMatch
-) {
+/* ========================================================
+   DEPARTURE DETECTION
+   ======================================================== */
 
-  const source =
-    NPCSpawn_Normalize(text);
+/*
+IMPORTANT FIX:
+The old multiline regex literal was invalid JavaScript.
 
-
-  if (!source) {
-    return null;
-  }
-
-
-  const matches =
-    NPCSpawn_FindLocationMatches(
-      text
-    );
-
-
-  for (
-    const match
-    of matches
-  ) {
-
-    if (
-      allowLooseMatch ||
-      NPCSpawn_HasLocationCue(
-        source,
-        match.index,
-        match.alias.length
-      )
-    ) {
-
-      return match.location;
-    }
-  }
-
-
-  return null;
-}
-
-
-
-// ============================================================
-// CURRENT LOCATION MANAGEMENT
-// ============================================================
-
-function NPCSpawn_SetCurrentLocation(
-  gameState,
-  location,
-  turn,
-  source
-) {
-
-  const data =
-    NPCSpawn_EnsureState(
-      gameState
-    );
-
-
-  if (!location) {
-    return false;
-  }
-
-
-  const newLocation =
-    location.name;
-
-
-  if (
-    data.currentLocation ===
-    newLocation
-  ) {
-
-    return false;
-  }
-
-
-  const hasVisitedBefore =
-    data.visitedLocations
-      .indexOf(newLocation) !== -1;
-
-
-  data.currentLocation =
-    newLocation;
-
-
-  if (!hasVisitedBefore) {
-
-    data.visitedLocations.push(
-      newLocation
-    );
-  }
-
-
-  data.lastEntry = {
-
-    location:
-      newLocation,
-
-    type:
-      hasVisitedBefore
-        ? "revisit"
-        : "first",
-
-    turn:
-      turn,
-
-    source:
-      source || "unknown"
-  };
-
-
-  // This means:
-  //
-  // "The player has just entered a location and this entry
-  // still has one spawn opportunity available."
-  //
-  data.entryPending =
-    true;
-
-
-  // A new location means any previous spawn decision that
-  // belonged to another location is no longer useful.
-  //
-  data.pendingSpawn =
-    null;
-
-
-  NPCSpawn_Debug(
-    "Location changed to " +
-    newLocation +
-    " (" +
-    (
-      hasVisitedBefore
-        ? "revisit"
-        : "first entry"
-    ) +
-    ")"
-  );
-
-
-  return true;
-}
-
-
-
-// ------------------------------------------------------------
-// Detects whether the player explicitly left the current
-// location without naming a destination.
-//
-// This prevents the script from believing the player is still
-// inside the old location when the destination is unknown.
-//
-// Example:
-//
-//     "I leave the inn."
-//
-// becomes:
-//
-//     currentLocation = unknown
-//
-// until the next destination is established.
-// ------------------------------------------------------------
+Again, the same pattern is kept, but now written as a
+valid single-line JavaScript regex.
+*/
 
 function NPCSpawn_IsLeavingCurrentLocation(
   text,
@@ -1195,37 +797,29 @@ function NPCSpawn_IsLeavingCurrentLocation(
   if (
     !currentLocationName
   ) {
-
     return false;
   }
-
 
   const source =
     NPCSpawn_Normalize(
       text
     );
 
-
   const currentLocation =
     NPCSpawn_GetLocationByName(
       currentLocationName
     );
 
-
   if (!currentLocation) {
     return false;
   }
-
 
   const aliases =
     NPCSpawn_GetAliases(
       currentLocation
     );
 
-
-  let mentioned =
-    false;
-
+  let mentioned = false;
 
   for (
     const alias
@@ -1233,44 +827,22 @@ function NPCSpawn_IsLeavingCurrentLocation(
   ) {
 
     if (
-      source.indexOf(alias) !==
-      -1
+      source.indexOf(
+        alias
+      ) !== -1
     ) {
 
-      mentioned =
-        true;
-
+      mentioned = true;
       break;
     }
   }
-
 
   if (!mentioned) {
     return false;
   }
 
-
   const departurePattern =
-    /\b(
-      leave|
-      leaves|
-      left|
-      leaving|
-      exit|
-      exits|
-      exited|
-      departing|
-      depart|
-      departed|
-      salir|
-      salgo|
-      sale|
-      saliendo|
-      marcho|
-      marcharse|
-      me voy
-    )\b/i;
-
+    /\b(leave|leaves|left|leaving|exit|exits|exited|departing|depart|departed|salir|salgo|sale|saliendo|marcho|marcharse|me voy)\b/i;
 
   return departurePattern.test(
     source
@@ -1278,466 +850,763 @@ function NPCSpawn_IsLeavingCurrentLocation(
 }
 
 
+/* ========================================================
+   CURRENT LOCATION
+   ======================================================== */
 
-// ============================================================
-// HISTORY-BASED LOCATION DETECTION
-// ============================================================
-//
-// Used mainly when the script starts with no known current
-// location.
-//
-// The "start" action is allowed to match a location directly.
-//
-// Later actions still require movement/location wording to
-// avoid switching locations because somebody merely mentioned
-// another place in dialogue.
-// ============================================================
-
-function NPCSpawn_InferLocationFromHistory(
-  history
+function NPCSpawn_SetCurrentLocation(
+  state,
+  location,
+  turn
 ) {
 
   if (
-    !Array.isArray(history) ||
-    history.length === 0
+    !state ||
+    !location
   ) {
+    return false;
+  }
 
+  const previousLocation =
+    state.currentLocation;
+
+  const sameLocation =
+    NPCSpawn_Normalize(
+      previousLocation
+    ) ===
+    NPCSpawn_Normalize(
+      location.name
+    );
+
+  if (sameLocation) {
+    return false;
+  }
+
+  const alreadyVisited =
+    !!state.visitedLocations[
+      location.name
+    ];
+
+  state.currentLocation =
+    location.name;
+
+  state.visitedLocations[
+    location.name
+  ] = true;
+
+  state.entryPending = true;
+
+  state.lastEntry = {
+    location:
+      location.name,
+
+    turn:
+      turn,
+
+    type:
+      alreadyVisited
+        ? "revisit"
+        : "first"
+  };
+
+  NPCSpawn_Debug(
+    "Entered location: " +
+    location.name +
+    " (" +
+    state.lastEntry.type +
+    ")"
+  );
+
+  return true;
+}
+
+
+/* ========================================================
+   LOCATION DETECTION FROM INPUT
+   ======================================================== */
+
+function NPCSpawn_DetectLocationFromInput(
+  text,
+  state,
+  turn
+) {
+
+  if (
+    !state
+  ) {
     return null;
   }
 
-
-  const start =
-    Math.max(
-      0,
-      history.length - 6
+  const source =
+    NPCSpawn_Normalize(
+      text
     );
 
+  if (!source) {
+    return null;
+  }
+
+  const matches =
+    NPCSpawn_FindLocationMatches(
+      source
+    );
+
+  if (
+    matches.length === 0
+  ) {
+    return null;
+  }
+
+  /*
+  Prefer the latest location mention in the text.
+  */
+
+  let selected =
+    matches[0];
 
   for (
-    let index =
-      history.length - 1;
-
-    index >= start;
-
-    index--
+    const match
+    of matches
   ) {
 
-    const action =
-      history[index];
-
-
     if (
-      !action ||
-      typeof action.text !==
-      "string"
+      match.index >=
+      selected.index
     ) {
 
-      continue;
-    }
-
-
-    const allowLoose =
-      action.type === "start";
-
-
-    const location =
-      NPCSpawn_FindLocationFromText(
-        action.text,
-        allowLoose
-      );
-
-
-    if (location) {
-
-      return location;
+      selected =
+        match;
     }
   }
 
+  const currentLocation =
+    state.currentLocation;
+
+  if (
+    currentLocation &&
+    NPCSpawn_IsLeavingCurrentLocation(
+      source,
+      currentLocation
+    )
+  ) {
+
+    NPCSpawn_Debug(
+      "Detected departure from: " +
+      currentLocation
+    );
+  }
+
+  if (
+    NPCSpawn_HasLocationCue(
+      source,
+      selected.index,
+      selected.alias.length
+    )
+  ) {
+
+    NPCSpawn_SetCurrentLocation(
+      state,
+      selected.location,
+      turn
+    );
+
+    return selected.location;
+  }
+
+  /*
+  If the text itself is just the location name or clearly
+  identifies a location, accept it anyway.
+  */
+
+  if (
+    source ===
+    selected.alias
+  ) {
+
+    NPCSpawn_SetCurrentLocation(
+      state,
+      selected.location,
+      turn
+    );
+
+    return selected.location;
+  }
 
   return null;
 }
 
 
+/* ========================================================
+   LOCATION DETECTION FROM HISTORY
+   ======================================================== */
 
-// ============================================================
-// CHARACTER HELPERS
-// ============================================================
-
-function NPCSpawn_GetCharacterCandidates(
-  location,
-  gameState,
+function NPCSpawn_DetectLocationFromHistory(
+  state,
+  history,
   turn
 ) {
 
-  const data =
-    NPCSpawn_EnsureState(
-      gameState
-    );
+  if (
+    !state ||
+    !Array.isArray(history)
+  ) {
+    return null;
+  }
 
+  for (
+    let index =
+      history.length - 1;
+    index >= 0;
+    index--
+  ) {
+
+    const item =
+      history[index];
+
+    let text = "";
+
+    if (
+      typeof item === "string"
+    ) {
+
+      text = item;
+
+    } else if (
+      item &&
+      typeof item === "object"
+    ) {
+
+      if (
+        typeof item.text === "string"
+      ) {
+
+        text =
+          item.text;
+
+      } else if (
+        typeof item.content === "string"
+      ) {
+
+        text =
+          item.content;
+      }
+    }
+
+    if (!text) {
+      continue;
+    }
+
+    const location =
+      NPCSpawn_DetectLocationFromInput(
+        text,
+        state,
+        turn
+      );
+
+    if (location) {
+      return location;
+    }
+  }
+
+  return null;
+}
+
+
+/* ========================================================
+   WEIGHTED SELECTION
+   ======================================================== */
+
+function NPCSpawn_GetCharacterEntries(
+  location
+) {
 
   const result = [];
 
-
-  const characterObject =
-    location &&
-    location.characters &&
-    typeof location.characters === "object"
-      ? location.characters
-      : {};
-
+  if (
+    !location ||
+    !location.characters ||
+    typeof location.characters !== "object"
+  ) {
+    return result;
+  }
 
   for (
     const name
     of Object.keys(
-      characterObject
+      location.characters
     )
   ) {
 
-    if (
-      NPCSpawn_IsPlaceholder(
-        name
-      )
-    ) {
-
-      continue;
-    }
-
-
     const weight =
-      NPCSpawn_PositiveNumber(
-        characterObject[name],
-        0
-      );
-
-
-    if (
-      weight <= 0
-    ) {
-
-      continue;
-    }
-
-
-    const lastTurn =
       Number(
-        data.lastAppearanceTurn[
-          name
-        ]
+        location.characters[name]
       );
-
-
-    const lastLocation =
-      String(
-        data.characterLocations[
-          name
-        ] || ""
-      );
-
-
-    // --------------------------------------------------------
-    // CONTINUITY LOCK
-    // --------------------------------------------------------
-    //
-    // If the character was recently seen somewhere ELSE,
-    // don't automatically spawn them here.
-    //
-    // This is the main protection against:
-    //
-    //     Turn 20 -> NPC is in the café
-    //     Turn 21 -> NPC magically appears in the mansion
-    //
-    // However, if the character was last seen at THIS SAME
-    // location, they remain eligible.
-    // --------------------------------------------------------
 
     if (
-      Number.isFinite(lastTurn) &&
-      (
-        turn -
-        lastTurn
-      ) <=
-      NPC_SPAWN_ENGINE_SETTINGS
-        .continuityLockTurns &&
-      lastLocation &&
-      lastLocation !==
-      location.name
+      !NPCSpawn_IsPlaceholder(
+        name
+      ) &&
+      Number.isFinite(
+        weight
+      ) &&
+      weight > 0
     ) {
 
-      continue;
+      result.push(
+        {
+          name,
+          weight
+        }
+      );
     }
-
-
-    result.push({
-
-      name,
-
-      weight
-
-    });
   }
-
 
   return result;
 }
 
 
-function NPCSpawn_WeightedPick(
-  candidates
+function NPCSpawn_SelectWeightedCharacter(
+  entries,
+  excludedNames
 ) {
 
   if (
-    !Array.isArray(candidates) ||
-    candidates.length === 0
+    !Array.isArray(entries) ||
+    entries.length === 0
   ) {
-
     return null;
   }
 
-
-  let totalWeight =
-    0;
-
+  const available = [];
 
   for (
-    const candidate
-    of candidates
+    const entry
+    of entries
+  ) {
+
+    if (
+      !excludedNames ||
+      excludedNames.indexOf(
+        entry.name
+      ) === -1
+    ) {
+
+      available.push(
+        entry
+      );
+    }
+  }
+
+  if (
+    available.length === 0
+  ) {
+    return null;
+  }
+
+  let totalWeight = 0;
+
+  for (
+    const entry
+    of available
   ) {
 
     totalWeight +=
-      candidate.weight;
+      Number(
+        entry.weight
+      );
   }
-
 
   if (
     totalWeight <= 0
   ) {
-
     return null;
   }
-
 
   let roll =
     Math.random() *
     totalWeight;
 
-
   for (
-    const candidate
-    of candidates
+    const entry
+    of available
   ) {
 
     roll -=
-      candidate.weight;
-
+      Number(
+        entry.weight
+      );
 
     if (
       roll <= 0
     ) {
 
-      return candidate;
+      return entry.name;
     }
   }
 
-
-  return candidates[
-    candidates.length - 1
-  ];
+  return available[
+    available.length - 1
+  ].name;
 }
 
 
+/* ========================================================
+   CONTINUITY LOCK
+   ======================================================== */
 
-// ------------------------------------------------------------
-// Selects the requested number of DIFFERENT characters.
-//
-// Important:
-//
-// This does NOT simply take the first characters from the list.
-//
-// Every selected character is chosen using its configured
-// weight.
-//
-// Once selected, that character is removed from the pool so it
-// cannot be selected twice in the same spawn event.
-// ------------------------------------------------------------
-
-function NPCSpawn_SelectCharacters(
-  location,
-  gameState,
+function NPCSpawn_IsCharacterLocked(
+  state,
+  characterName,
+  locationName,
   turn
 ) {
 
-  const available =
-    NPCSpawn_GetCharacterCandidates(
-      location,
-      gameState,
-      turn
-    );
+  if (
+    !state ||
+    !state.recentPresence
+  ) {
+    return false;
+  }
 
+  const record =
+    state.recentPresence[
+      characterName
+    ];
 
   if (
-    available.length === 0
+    !record ||
+    !Number.isFinite(
+      Number(record.turn)
+    )
   ) {
+    return false;
+  }
 
+  const turnsSinceSeen =
+    Number(turn) -
+    Number(record.turn);
+
+  if (
+    turnsSinceSeen <
+    0
+  ) {
+    return false;
+  }
+
+  if (
+    turnsSinceSeen >
+    Number(
+      SPAWN_CONFIG.continuityLockTurns
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    NPCSpawn_Normalize(
+      record.location
+    ) ===
+    NPCSpawn_Normalize(
+      locationName
+    )
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+
+/* ========================================================
+   SELECT NPCS
+   ======================================================== */
+
+function NPCSpawn_SelectCharacters(
+  state,
+  location,
+  turn
+) {
+
+  const entries =
+    NPCSpawn_GetCharacterEntries(
+      location
+    );
+
+  if (
+    entries.length === 0
+  ) {
     return [];
   }
 
-
-  const count =
+  const maxCharacters =
     Math.min(
-      NPCSpawn_PositiveInteger(
-        location.charactersPerSpawn,
-        1
+      NPCSpawn_ClampCount(
+        location.charactersPerSpawn
       ),
-      available.length
+      entries.length
     );
-
 
   const selected = [];
 
-
-  while (
-    selected.length <
-    count &&
-    available.length > 0
+  for (
+    let count = 0;
+    count < maxCharacters;
+    count++
   ) {
 
-    const picked =
-      NPCSpawn_WeightedPick(
-        available
+    const available =
+      [];
+
+    for (
+      const entry
+      of entries
+    ) {
+
+      if (
+        selected.indexOf(
+          entry.name
+        ) !== -1
+      ) {
+        continue;
+      }
+
+      if (
+        NPCSpawn_IsCharacterLocked(
+          state,
+          entry.name,
+          location.name,
+          turn
+        )
+      ) {
+        continue;
+      }
+
+      available.push(
+        entry
       );
+    }
 
-
-    if (!picked) {
+    if (
+      available.length === 0
+    ) {
       break;
     }
 
+    const chosen =
+      NPCSpawn_SelectWeightedCharacter(
+        available,
+        selected
+      );
+
+    if (!chosen) {
+      break;
+    }
 
     selected.push(
-      picked.name
+      chosen
     );
-
-
-    const pickedIndex =
-      available.indexOf(
-        picked
-      );
-
-
-    if (
-      pickedIndex !== -1
-    ) {
-
-      available.splice(
-        pickedIndex,
-        1
-      );
-    }
   }
-
 
   return selected;
 }
 
 
+/* ========================================================
+   SPAWN CHANCE
+   ======================================================== */
 
-// ============================================================
-// STORY CARD SUPPORT
-// ============================================================
+function NPCSpawn_GetEntryChance(
+  state,
+  location
+) {
+
+  if (
+    !state ||
+    !location
+  ) {
+    return 0;
+  }
+
+  const firstVisit =
+    !state.visitedLocations[
+      location.name
+    ];
+
+  /*
+  Normally this function is called AFTER the location has
+  already been marked visited, so use lastEntry.type when
+  available.
+  */
+
+  if (
+    state.lastEntry &&
+    NPCSpawn_Normalize(
+      state.lastEntry.location
+    ) ===
+    NPCSpawn_Normalize(
+      location.name
+    )
+  ) {
+
+    if (
+      state.lastEntry.type ===
+      "first"
+    ) {
+
+      return NPCSpawn_ClampChance(
+        location.firstEntryChance
+      );
+    }
+
+    return NPCSpawn_ClampChance(
+      location.revisitChance
+    );
+  }
+
+  if (firstVisit) {
+
+    return NPCSpawn_ClampChance(
+      location.firstEntryChance
+    );
+  }
+
+  return NPCSpawn_ClampChance(
+    location.revisitChance
+  );
+}
+
+
+/* ========================================================
+   STORY CARD HELPERS
+   ======================================================== */
+
+function NPCSpawn_GetStoryCardKeyText(
+  card
+) {
+
+  if (!card) {
+    return "";
+  }
+
+  if (
+    Array.isArray(
+      card.keys
+    )
+  ) {
+
+    return card.keys.join(
+      ", "
+    );
+  }
+
+  if (
+    typeof card.keys === "string"
+  ) {
+
+    return card.keys;
+  }
+
+  if (
+    typeof card.key === "string"
+  ) {
+
+    return card.key;
+  }
+
+  if (
+    typeof card.name === "string"
+  ) {
+
+    return card.name;
+  }
+
+  return "";
+}
+
+
+function NPCSpawn_GetStoryCardEntryText(
+  card
+) {
+
+  if (!card) {
+    return "";
+  }
+
+  if (
+    typeof card.entry === "string"
+  ) {
+
+    return card.entry;
+  }
+
+  if (
+    typeof card.text === "string"
+  ) {
+
+    return card.text;
+  }
+
+  if (
+    typeof card.content === "string"
+  ) {
+
+    return card.content;
+  }
+
+  return "";
+}
+
 
 function NPCSpawn_FindStoryCard(
-  characterName,
-  storyCards
+  storyCards,
+  characterName
 ) {
 
   if (
     !Array.isArray(storyCards)
   ) {
-
     return null;
   }
-
 
   const target =
     NPCSpawn_Normalize(
       characterName
     );
 
+  if (!target) {
+    return null;
+  }
 
   for (
     const card
     of storyCards
   ) {
 
-    if (
-      !card ||
-      typeof card !== "object"
-    ) {
-
-      continue;
-    }
-
-
-    let keysText = "";
-
-
-    if (
-      Array.isArray(card.keys)
-    ) {
-
-      keysText =
-        card.keys.join(",");
-    }
-
-    else {
-
-      keysText =
-        String(
-          card.keys || ""
-        );
-    }
-
-
-    const normalizedKeys =
+    const keyText =
       NPCSpawn_Normalize(
-        keysText
+        NPCSpawn_GetStoryCardKeyText(
+          card
+        )
       );
 
-
-    if (!normalizedKeys) {
-      continue;
-    }
-
-
-    const keys =
-      normalizedKeys
-        .split(",")
-        .map(
-          key =>
-            key.trim()
+    const entryText =
+      NPCSpawn_Normalize(
+        NPCSpawn_GetStoryCardEntryText(
+          card
         )
-        .filter(Boolean);
+      );
 
-
-    // Prefer an exact trigger match.
     if (
-      keys.indexOf(target) !== -1
+      keyText.indexOf(
+        target
+      ) !== -1
     ) {
 
       return card;
     }
 
-
-    // Also allow the configured character name to be part of
-    // a larger Story Card trigger.
-    //
-    // Example:
-    //
-    // character = "Mira"
-    //
-    // card trigger = "Mira the Innkeeper"
-    //
     if (
-      normalizedKeys.indexOf(
+      entryText.indexOf(
         target
       ) !== -1
     ) {
@@ -1746,929 +1615,658 @@ function NPCSpawn_FindStoryCard(
     }
   }
 
-
   return null;
 }
 
 
-function NPCSpawn_ContainsStoryCardEntry(
-  contextText,
-  entry
-) {
-
-  if (
-    !contextText ||
-    !entry
-  ) {
-
-    return false;
-  }
-
-
-  const normalizedContext =
-    NPCSpawn_Normalize(
-      contextText
-    );
-
-
-  const normalizedEntry =
-    NPCSpawn_Normalize(
-      entry
-    );
-
-
-  if (
-    !normalizedEntry
-  ) {
-
-    return false;
-  }
-
-
-  // Only compare a fragment rather than the entire card.
-  //
-  // This is enough to detect that the same card entry is
-  // already present without making the check unnecessarily
-  // expensive.
-  const fragment =
-    normalizedEntry.slice(
-      0,
-      180
-    );
-
-
-  return (
-    normalizedContext.indexOf(
-      fragment
-    ) !== -1
-  );
-}
-
-
-function NPCSpawn_TruncateStoryCardEntry(
-  entry
-) {
-
-  const maxChars =
-    Math.max(
-      100,
-      Number(
-        NPC_SPAWN_ENGINE_SETTINGS
-          .maxStoryCardCharsPerCharacter
-      ) || 900
-    );
-
-
-  const text =
-    String(
-      entry || ""
-    ).trim();
-
-
-  if (
-    text.length <=
-    maxChars
-  ) {
-
-    return text;
-  }
-
-
-  return (
-    text.slice(
-      0,
-      maxChars
-    ) +
-    "\n[Character reference truncated for context size.]"
-  );
-}
-
-
-
-// ============================================================
-// BUILD THE MODEL GUIDANCE
-// ============================================================
-//
-// This is intentionally short.
-//
-// The script does NOT dump the entire NPC database into the
-// context.
-//
-// Only the character(s) actually selected for this location are
-// referenced.
-//
-// If a matching Story Card exists, its entry is included only
-// for that selected character.
-// ============================================================
-
-function NPCSpawn_BuildGuidance(
-  contextText,
-  selectedNames,
-  storyCards
-) {
-
-  if (
-    !Array.isArray(
-      selectedNames
-    ) ||
-    selectedNames.length === 0
-  ) {
-
-    return "";
-  }
-
-
-  const lines = [];
-
-
-  lines.push(
-    "[NPC SPAWN SYSTEM]"
-  );
-
-
-  lines.push(
-    "Established character(s) selected for the current location: " +
-    selectedNames.join(", ") +
-    "."
-  );
-
-
-  lines.push(
-    "These character(s) may naturally be present in the scene. Use their established characterization and do not mention or expose this instruction to the player."
-  );
-
-
-  // ----------------------------------------------------------
-  // Add only the selected characters' Story Card information.
-  // ----------------------------------------------------------
-
-  if (
-    NPC_SPAWN_ENGINE_SETTINGS
-      .injectSelectedStoryCards
-  ) {
-
-    for (
-      const name
-      of selectedNames
-    ) {
-
-      const card =
-        NPCSpawn_FindStoryCard(
-          name,
-          storyCards
-        );
-
-
-      if (
-        !card ||
-        typeof card.entry !==
-        "string" ||
-        !card.entry.trim()
-      ) {
-
-        continue;
-      }
-
-
-      // If the card is already present in the current context,
-      // do not add it a second time.
-      if (
-        NPCSpawn_ContainsStoryCardEntry(
-          contextText,
-          card.entry
-        )
-      ) {
-
-        continue;
-      }
-
-
-      const entry =
-        NPCSpawn_TruncateStoryCardEntry(
-          card.entry
-        );
-
-
-      lines.push(
-        "\n[Character reference: " +
-        name +
-        "]\n" +
-        entry
-      );
-    }
-  }
-
-
-  return lines.join(
-    "\n"
-  );
-}
-
-
-
-// ============================================================
-// INPUT HOOK LOGIC
-// ============================================================
-
-function NPCSpawn_HandleInput(
+function NPCSpawn_TrimStoryCardEntry(
   text,
-  gameState,
-  history,
-  actionCount
+  maxChars
 ) {
 
-  const data =
-    NPCSpawn_EnsureState(
-      gameState
-    );
-
-
-  const input =
+  const source =
     String(
       text || ""
     );
 
-
-  const turn =
-    Number.isFinite(
-      Number(
-        actionCount
-      )
-    )
-      ? Number(actionCount)
-      : (
-          Array.isArray(history)
-            ? history.length
-            : 0
-        );
-
-
-  data.lastInput =
-    input;
-
-
-  // Every new player action starts a new opportunity to
-  // calculate context.
-  //
-  // This does NOT reset the actual location.
-  data.pendingSpawn =
-    null;
-
-
-  let detectedLocation =
-    null;
-
-
-  // ----------------------------------------------------------
-  // CASE 1:
-  // The player explicitly moved to a different known location.
-  // ----------------------------------------------------------
-
-  if (
-    data.currentLocation
-  ) {
-
-    detectedLocation =
-      NPCSpawn_FindLocationFromText(
-        input,
-        false
-      );
-  }
-
-
-  // ----------------------------------------------------------
-  // CASE 2:
-  // There is no known current location yet.
-  //
-  // In this situation we are more permissive because we need
-  // some way to establish the player's first location.
-  // ----------------------------------------------------------
-
-  if (
-    !data.currentLocation
-  ) {
-
-    detectedLocation =
-      NPCSpawn_FindLocationFromText(
-        input,
-        true
-      );
-  }
-
-
-  if (
-    detectedLocation
-  ) {
-
-    NPCSpawn_SetCurrentLocation(
-      gameState,
-      detectedLocation,
-      turn,
-      "input"
+  const limit =
+    Math.max(
+      1,
+      Number(maxChars) || 900
     );
 
+  if (
+    source.length <= limit
+  ) {
 
+    return source;
+  }
+
+  return (
+    source.slice(
+      0,
+      Math.max(
+        0,
+        limit - 3
+      )
+    ) +
+    "..."
+  );
+}
+
+
+/* ========================================================
+   SPAWN GUIDANCE
+   ======================================================== */
+
+function NPCSpawn_BuildContextGuidance(
+  state,
+  selectedCharacters,
+  storyCards
+) {
+
+  if (
+    !state ||
+    !state.currentLocation ||
+    !Array.isArray(
+      selectedCharacters
+    ) ||
+    selectedCharacters.length === 0
+  ) {
+    return "";
+  }
+
+  let guidance =
+    "NPC SPAWN INSTRUCTION: " +
+    "Naturally include the following character";
+
+  if (
+    selectedCharacters.length !== 1
+  ) {
+
+    guidance +=
+      "s";
+  }
+
+  guidance +=
+    " in the current scene at " +
+    state.currentLocation +
+    ": " +
+    selectedCharacters.join(
+      ", "
+    ) +
+    ". " +
+    "Do not force unnatural behavior. " +
+    "Let the character(s) act according to their established personality, circumstances, and location.";
+
+  if (
+    SPAWN_CONFIG.injectSelectedStoryCards &&
+    Array.isArray(storyCards)
+  ) {
+
+    for (
+      const characterName
+      of selectedCharacters
+    ) {
+
+      const card =
+        NPCSpawn_FindStoryCard(
+          storyCards,
+          characterName
+        );
+
+      if (!card) {
+        continue;
+      }
+
+      const entry =
+        NPCSpawn_TrimStoryCardEntry(
+          NPCSpawn_GetStoryCardEntryText(
+            card
+          ),
+          SPAWN_CONFIG.maxStoryCardCharsPerCharacter
+        );
+
+      if (!entry) {
+        continue;
+      }
+
+      guidance +=
+        "\n\nCHARACTER CONTEXT FOR " +
+        characterName +
+        ":\n" +
+        entry;
+    }
+  }
+
+  return guidance;
+}
+
+
+/* ========================================================
+   HANDLE INPUT
+   ======================================================== */
+
+function NPCSpawn_HandleInput(
+  text,
+  stateRoot,
+  history,
+  turn
+) {
+
+  const state =
+    NPCSpawn_GetState(
+      stateRoot
+    );
+
+  if (!state) {
     return;
   }
 
-
-  // ----------------------------------------------------------
-  // If the player explicitly leaves the current location without
-  // giving us a destination, stop pretending the player is still
-  // inside that location.
-  // ----------------------------------------------------------
-
-  if (
-    NPCSpawn_IsLeavingCurrentLocation(
-      input,
-      data.currentLocation
-    )
-  ) {
-
-    NPCSpawn_Debug(
-      "Player left current location without a known destination."
+  const source =
+    String(
+      text || ""
     );
 
+  if (
+    !source
+  ) {
+    return;
+  }
 
-    data.currentLocation =
-      "";
+  if (
+    state.lastProcessedInput ===
+    source
+  ) {
+    return;
+  }
 
-    data.entryPending =
-      false;
+  state.lastProcessedInput =
+    source;
 
-    data.lastEntry =
-      null;
+  /*
+  Try direct input first.
+  */
+
+  NPCSpawn_DetectLocationFromInput(
+    source,
+    state,
+    turn
+  );
+
+  /*
+  If nothing was detected, look through history.
+  This helps when the player's input is very short.
+  */
+
+  if (
+    !state.currentLocation
+  ) {
+
+    NPCSpawn_DetectLocationFromHistory(
+      state,
+      history,
+      turn
+    );
   }
 }
 
 
-
-// ============================================================
-// CONTEXT HOOK LOGIC
-// ============================================================
-//
-// This is where the script decides whether an NPC should be
-// selected BEFORE the AI generates its response.
-// ============================================================
+/* ========================================================
+   HANDLE CONTEXT
+   ======================================================== */
 
 function NPCSpawn_HandleContext(
-  contextText,
-  gameState,
+  text,
+  stateRoot,
   history,
   storyCards,
-  actionCount
+  turn
 ) {
 
-  const data =
-    NPCSpawn_EnsureState(
-      gameState
+  const state =
+    NPCSpawn_GetState(
+      stateRoot
     );
 
-
-  const turn =
-    Number.isFinite(
-      Number(
-        actionCount
-      )
-    )
-      ? Number(actionCount)
-      : (
-          Array.isArray(history)
-            ? history.length
-            : 0
-        );
-
-
-  // ----------------------------------------------------------
-  // Try to establish the initial location if we do not have one.
-  // ----------------------------------------------------------
-
-  if (
-    !data.currentLocation
-  ) {
-
-    const inferredLocation =
-      NPCSpawn_InferLocationFromHistory(
-        history
-      );
-
-
-    if (
-      inferredLocation
-    ) {
-
-      NPCSpawn_SetCurrentLocation(
-        gameState,
-        inferredLocation,
-        turn,
-        "history"
-      );
-    }
-  }
-
-
-  // ----------------------------------------------------------
-  // If the player has not just entered a location, there is no
-  // reason to attempt another NPC spawn.
-  //
-  // This is important:
-  //
-  // The system does NOT roll a new NPC every single turn while
-  // the player is standing in the same room.
-  //
-  // It only gets one spawn opportunity per location entry.
-  // ----------------------------------------------------------
-
-  if (
-    !data.entryPending ||
-    !data.currentLocation
-  ) {
-
+  if (!state) {
     return "";
   }
 
-
-  // ----------------------------------------------------------
-  // IMPORTANT:
-  //
-  // If Context runs more than once for the same generation,
-  // reuse the previous result instead of rolling Math.random()
-  // again.
-  //
-  // This prevents retries from changing the selected NPC.
-  // ----------------------------------------------------------
+  /*
+  Do not spawn unless a new location entry is pending.
+  */
 
   if (
-    data.pendingSpawn &&
-    data.pendingSpawn.turn === turn &&
-    data.pendingSpawn.location ===
-      data.currentLocation
+    !state.entryPending
   ) {
-
-    return NPCSpawn_BuildGuidance(
-      contextText,
-      data.pendingSpawn.names,
-      storyCards
-    );
+    return "";
   }
-
 
   const location =
     NPCSpawn_GetLocationByName(
-      data.currentLocation
+      state.currentLocation
     );
-
 
   if (!location) {
 
-    data.entryPending =
+    state.entryPending =
       false;
-
-    data.pendingSpawn = {
-
-      turn,
-      location:
-        data.currentLocation,
-
-      names: []
-
-    };
-
 
     return "";
   }
 
+  const chance =
+    NPCSpawn_GetEntryChance(
+      state,
+      location
+    );
 
-  // ----------------------------------------------------------
-  // FIRST ENTRY VS REVISIT
-  // ----------------------------------------------------------
+  /*
+  Consume the entry flag now so the same entry cannot
+  repeatedly roll a new spawn during the same generation.
+  */
 
-  let chance;
-
-
-  if (
-    data.lastEntry &&
-    data.lastEntry.type ===
-      "first"
-  ) {
-
-    chance =
-      NPCSpawn_ClampChance(
-        location.firstEntryChance,
-        25
-      );
-  }
-
-  else {
-
-    chance =
-      NPCSpawn_ClampChance(
-        location.revisitChance,
-        10
-      );
-  }
-
-
-  // This location has now used its single spawn opportunity.
-  data.entryPending =
+  state.entryPending =
     false;
 
-
-  // ----------------------------------------------------------
-  // LOCATION SPAWN ROLL
-  // ----------------------------------------------------------
-
-  const locationRoll =
-    Math.random() *
-    100;
-
-
   if (
-    locationRoll >=
+    Math.random() * 100 >=
     chance
   ) {
+
+    state.pendingSpawn =
+      null;
 
     NPCSpawn_Debug(
       "No spawn at " +
       location.name +
       " (" +
       chance +
-      "% chance failed)."
+      "% chance)"
     );
-
-
-    data.pendingSpawn = {
-
-      turn,
-      location:
-        location.name,
-
-      names: []
-
-    };
-
 
     return "";
   }
 
-
-  // ----------------------------------------------------------
-  // SELECT THE CHARACTER(S)
-  // ----------------------------------------------------------
-
-  const selectedNames =
+  const selected =
     NPCSpawn_SelectCharacters(
+      state,
       location,
-      gameState,
       turn
     );
 
+  if (
+    selected.length === 0
+  ) {
 
-  data.pendingSpawn = {
+    state.pendingSpawn =
+      null;
 
-    turn,
+    return "";
+  }
+
+  state.pendingSpawn = {
 
     location:
       location.name,
 
-    names:
-      selectedNames
+    characters:
+      selected.slice(),
 
+    turn:
+      turn
   };
 
-
-  if (
-    selectedNames.length === 0
-  ) {
-
-    NPCSpawn_Debug(
-      "Spawn roll succeeded, but there were no eligible characters."
-    );
-
-
-    return "";
-  }
-
-
   NPCSpawn_Debug(
-    "Selected at " +
-    location.name +
-    ": " +
-    selectedNames.join(", ")
+    "Selected NPCs: " +
+    selected.join(
+      ", "
+    ) +
+    " at " +
+    location.name
   );
 
-
-  return NPCSpawn_BuildGuidance(
-    contextText,
-    selectedNames,
+  return NPCSpawn_BuildContextGuidance(
+    state,
+    selected,
     storyCards
   );
 }
 
 
+/* ========================================================
+   HANDLE OUTPUT
+   ======================================================== */
 
-// ============================================================
-// OUTPUT PRESENCE DETECTION
-// ============================================================
-//
-// The important distinction:
-//
-// SELECTED ≠ ACTUALLY PRESENT
-//
-// The Context hook may select an NPC.
-//
-// The AI may still decide not to actually introduce them.
-//
-// We only record the NPC as truly present when their configured
-// name is detected in the generated output.
-//
-// This makes the continuity system much safer.
-// ============================================================
-
-
-function NPCSpawn_EscapeRegExp(value) {
-
-  return String(
-    value || ""
-  ).replace(
-    /[.*+?^${}()|[\]\\]/g,
-    "\\$&"
-  );
-}
-
-
-function NPCSpawn_ContainsPhrase(
+function NPCSpawn_HandleOutput(
   text,
-  phrase
-) {
-
-  const source =
-    NPCSpawn_Normalize(
-      text
-    );
-
-
-  const target =
-    NPCSpawn_Normalize(
-      phrase
-    );
-
-
-  if (
-    !source ||
-    !target
-  ) {
-
-    return false;
-  }
-
-
-  // For very short names, substring matching would create many
-  // accidental hits.
-  //
-  // Word-boundary matching is therefore used.
-  const pattern =
-    new RegExp(
-      "(^|[^a-z0-9])" +
-      NPCSpawn_EscapeRegExp(
-        target
-      ) +
-      "($|[^a-z0-9])",
-      "i"
-    );
-
-
-  return pattern.test(
-    source
-  );
-}
-
-
-function NPCSpawn_RecordCharacterPresence(
-  gameState,
-  characterName,
-  locationName,
+  stateRoot,
+  history,
   turn
 ) {
 
-  const data =
-    NPCSpawn_EnsureState(
-      gameState
+  const state =
+    NPCSpawn_GetState(
+      stateRoot
     );
 
-
-  data.characterLocations[
-    characterName
-  ] =
-    locationName;
-
-
-  data.lastAppearanceTurn[
-    characterName
-  ] =
-    turn;
-
-
-  NPCSpawn_Debug(
-    characterName +
-    " is confirmed present at " +
-    locationName
-  );
-}
-
-
-
-// ============================================================
-// OUTPUT HOOK LOGIC
-// ============================================================
-
-function NPCSpawn_HandleOutput(
-  outputText,
-  gameState,
-  history,
-  actionCount
-) {
-
-  const data =
-    NPCSpawn_EnsureState(
-      gameState
-    );
-
-
-  const output =
-    String(
-      outputText || ""
-    );
-
-
-  const turn =
-    Number.isFinite(
-      Number(
-        actionCount
-      )
-    )
-      ? Number(actionCount)
-      : (
-          Array.isArray(history)
-            ? history.length
-            : 0
-        );
-
-
-  if (!output) {
+  if (!state) {
     return;
   }
 
-
-  // ----------------------------------------------------------
-  // STEP 1:
-  //
-  // See whether the generated output moved the player to a
-  // different configured location.
-  //
-  // This is how the system can learn a new location even when
-  // the PLAYER did not explicitly state it.
-  // ----------------------------------------------------------
-
-  let detectedLocation =
-    NPCSpawn_FindLocationFromText(
-      output,
-      !data.currentLocation
+  const source =
+    String(
+      text || ""
     );
-
 
   if (
-    detectedLocation &&
-    (
-      detectedLocation.name !==
-      data.currentLocation
-    )
+    !source
+  ) {
+    return;
+  }
+
+  if (
+    state.lastProcessedOutput ===
+    source
+  ) {
+    return;
+  }
+
+  state.lastProcessedOutput =
+    source;
+
+
+  /*
+  ----------------------------------------------------------
+  FIRST:
+  Check whether the generated output mentions a configured
+  location.
+
+  This helps maintain location continuity even when the
+  player's input itself did not contain the location name.
+  ----------------------------------------------------------
+  */
+
+  const locationMatches =
+    NPCSpawn_FindLocationMatches(
+      source
+    );
+
+  if (
+    locationMatches.length > 0
   ) {
 
-    NPCSpawn_SetCurrentLocation(
-      gameState,
-      detectedLocation,
-      turn,
-      "output"
-    );
+    let selectedLocation =
+      locationMatches[0];
+
+    for (
+      const match
+      of locationMatches
+    ) {
+
+      if (
+        match.index >=
+        selectedLocation.index
+      ) {
+
+        selectedLocation =
+          match;
+      }
+    }
+
+    if (
+      NPCSpawn_HasLocationCue(
+        NPCSpawn_Normalize(
+          source
+        ),
+        selectedLocation.index,
+        selectedLocation.alias.length
+      )
+    ) {
+
+      NPCSpawn_SetCurrentLocation(
+        state,
+        selectedLocation.location,
+        turn
+      );
+    }
   }
 
 
-  // ----------------------------------------------------------
-  // STEP 2:
-  //
-  // Check ALL configured characters.
-  //
-  // We do not only check the characters selected by the spawn
-  // system because the AI might naturally introduce another
-  // established character on its own.
-  //
-  // If that happens, we still record their presence.
-  // ----------------------------------------------------------
+  /*
+  ----------------------------------------------------------
+  SECOND:
+  Check which configured NPC names actually appeared in
+  the generated output.
+
+  IMPORTANT:
+  Selection does NOT equal presence.
+
+  The NPC is only recorded as present if the generated text
+  actually mentions the character.
+  ----------------------------------------------------------
+  */
 
   const locations =
     NPCSpawn_GetValidLocations();
-
 
   for (
     const location
     of locations
   ) {
 
-    const characterObject =
-      location.characters &&
-      typeof location.characters === "object"
-        ? location.characters
-        : {};
-
+    const entries =
+      NPCSpawn_GetCharacterEntries(
+        location
+      );
 
     for (
-      const characterName
-      of Object.keys(
-        characterObject
-      )
+      const entry
+      of entries
     ) {
 
       if (
-        NPCSpawn_IsPlaceholder(
-          characterName
-        )
-      ) {
-
-        continue;
-      }
-
-
-      if (
         NPCSpawn_ContainsPhrase(
-          output,
-          characterName
+          source,
+          entry.name
         )
       ) {
 
-        if (
-          data.currentLocation
-        ) {
+        state.recentPresence[
+          entry.name
+        ] = {
 
-          NPCSpawn_RecordCharacterPresence(
-            gameState,
-            characterName,
-            data.currentLocation,
+          location:
+            state.currentLocation ||
+            location.name,
+
+          turn:
             turn
-          );
-        }
+        };
+
+        NPCSpawn_Debug(
+          "Confirmed presence: " +
+          entry.name +
+          " at " +
+          (
+            state.currentLocation ||
+            location.name
+          )
+        );
       }
     }
   }
 
 
-  // ----------------------------------------------------------
-  // STEP 3:
-  //
-  // The spawn decision has now finished.
-  //
-  // We can discard the temporary information used for this
-  // generation.
-  //
-  // IMPORTANT:
-  //
-  // If OUTPUT discovered a NEW location, SetCurrentLocation()
-  // created a new entryPending = true.
-  //
-  // That remains intact, which means the NEW location can get
-  // its own spawn opportunity on the next generation.
-  // ----------------------------------------------------------
+  /*
+  ----------------------------------------------------------
+  THIRD:
+  Clear the pending selection.
 
-  data.pendingSpawn =
+  The selection was already used for this generation.
+  Whether it became real in the story was determined above.
+  ----------------------------------------------------------
+  */
+
+  state.pendingSpawn =
     null;
 }
 
 
+/* ========================================================
+   CLEAN OLD CONTINUITY RECORDS
+   ======================================================== */
 
-// ============================================================
-// PUBLIC API
-// ============================================================
-//
-// These are the only functions used by Input / Context / Output.
-//
-// Keeping everything behind this small API makes the three hooks
-// extremely simple and much harder to accidentally break.
-// ============================================================
+function NPCSpawn_CleanupPresence(
+  state,
+  turn
+) {
 
-var NPCSpawn = {
+  if (
+    !state ||
+    !state.recentPresence
+  ) {
+    return;
+  }
 
-  version:
-    NPC_SPAWN_ENGINE_SETTINGS
-      ? "1.0.0"
-      : "1.0.0",
+  const limit =
+    Math.max(
+      1,
+      Number(
+        SPAWN_CONFIG.continuityLockTurns
+      ) || 3
+    );
+
+  for (
+    const characterName
+    of Object.keys(
+      state.recentPresence
+    )
+  ) {
+
+    const record =
+      state.recentPresence[
+        characterName
+      ];
+
+    if (
+      !record
+    ) {
+      delete state.recentPresence[
+        characterName
+      ];
+
+      continue;
+    }
+
+    if (
+      Number(turn) -
+      Number(record.turn) >
+      limit
+    ) {
+
+      delete state.recentPresence[
+        characterName
+      ];
+    }
+  }
+}
+
+
+/* ========================================================
+   PUBLIC API
+   ======================================================== */
+
+const NPCSpawn = {
 
   handleInput:
-    NPCSpawn_HandleInput,
+    function(
+      text,
+      state,
+      history,
+      turn
+    ) {
+
+      NPCSpawn_HandleInput(
+        text,
+        state,
+        history,
+        turn
+      );
+
+      const internalState =
+        NPCSpawn_GetState(
+          state
+        );
+
+      NPCSpawn_CleanupPresence(
+        internalState,
+        turn
+      );
+    },
+
 
   handleContext:
-    NPCSpawn_HandleContext,
+    function(
+      text,
+      state,
+      history,
+      storyCards,
+      turn
+    ) {
+
+      const internalState =
+        NPCSpawn_GetState(
+          state
+        );
+
+      NPCSpawn_CleanupPresence(
+        internalState,
+        turn
+      );
+
+      return NPCSpawn_HandleContext(
+        text,
+        state,
+        history,
+        storyCards,
+        turn
+      );
+    },
+
 
   handleOutput:
-    NPCSpawn_HandleOutput
+    function(
+      text,
+      state,
+      history,
+      turn
+    ) {
+
+      NPCSpawn_HandleOutput(
+        text,
+        state,
+        history,
+        turn
+      );
+
+      const internalState =
+        NPCSpawn_GetState(
+          state
+        );
+
+      NPCSpawn_CleanupPresence(
+        internalState,
+        turn
+      );
+    }
 
 };
+
+
+/*
+===========================================================
+END OF NPC SPAWN LIBRARY
+===========================================================
+*/
