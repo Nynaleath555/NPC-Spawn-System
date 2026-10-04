@@ -1,0 +1,116 @@
+// ============================================================
+// HOOK: CONTEXT
+// NPC SPAWN SYSTEM v1.0.0
+// ============================================================
+//
+// This is the MOST IMPORTANT hook for the actual spawn.
+//
+// It runs immediately before the AI receives the context.
+//
+// The engine:
+//
+//   1. Checks the current location.
+//   2. Determines whether this is a first visit or revisit.
+//   3. Rolls the configured location probability.
+//   4. Selects the configured character(s).
+//   5. Adds a very small hidden instruction to the AI context.
+//   6. Optionally includes the selected character's Story Card
+//      entry so the AI has the correct characterization immediately.
+//
+// The result is NOT shown directly to the player.
+// ============================================================
+
+
+const modifier = (text) => {
+
+  // ----------------------------------------------------------
+  // Safety check.
+  //
+  // If the Library is missing, do nothing.
+  // ----------------------------------------------------------
+
+  if (
+    typeof NPCSpawn === "undefined"
+  ) {
+
+    return {
+      text
+    };
+  }
+
+
+  const turn =
+    (
+      typeof info !== "undefined" &&
+      info &&
+      Number.isFinite(
+        Number(
+          info.actionCount
+        )
+      )
+    )
+      ? Number(
+          info.actionCount
+        )
+      : (
+          Array.isArray(history)
+            ? history.length
+            : 0
+        );
+
+
+  // ----------------------------------------------------------
+  // Ask the shared engine whether an NPC should be selected.
+  //
+  // The engine returns:
+  //
+  //     "" 
+  //
+  // when nothing needs to be added.
+  //
+  // Otherwise it returns the hidden NPC spawn guidance.
+  // ----------------------------------------------------------
+
+  const guidance =
+    NPCSpawn.handleContext(
+      String(text || ""),
+      state,
+      history,
+      storyCards,
+      turn
+    );
+
+
+  // ----------------------------------------------------------
+  // Only change the context if the engine actually produced
+  // spawn guidance.
+  //
+  // Otherwise the original AI Dungeon context is untouched.
+  // ----------------------------------------------------------
+
+  if (
+    guidance
+  ) {
+
+    text +=
+      "\n\n" +
+      guidance;
+  }
+
+
+  // ----------------------------------------------------------
+  // IMPORTANT:
+  //
+  // Context scripts modify the text that is sent to the AI.
+  // They do not directly modify what the player sees.
+  // ----------------------------------------------------------
+
+  return {
+    text
+  };
+};
+
+
+// DO NOT REMOVE THIS LINE.
+// AI Dungeon requires modifier(text) in non-Library hooks.
+modifier(text);
