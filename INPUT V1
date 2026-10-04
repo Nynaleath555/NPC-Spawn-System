@@ -1,0 +1,101 @@
+// ============================================================
+// HOOK: INPUT
+// NPC SPAWN SYSTEM v1.0.0
+// ============================================================
+//
+// This hook runs when the PLAYER submits an action.
+//
+// Its job is deliberately simple:
+//
+//   1. Remember the player's input.
+//   2. Detect whether the player moved to a configured location.
+//   3. Tell the shared NPC Spawn Engine about that movement.
+//
+// DO NOT put your location configuration here.
+//
+// The editable configuration lives in the LIBRARY.
+// ============================================================
+
+
+const modifier = (text) => {
+
+  // ----------------------------------------------------------
+  // Safety check.
+  //
+  // If the Library was not loaded for some reason, simply let
+  // the player's input pass through unchanged instead of
+  // breaking the entire scenario.
+  // ----------------------------------------------------------
+
+  if (
+    typeof NPCSpawn === "undefined"
+  ) {
+
+    return {
+      text
+    };
+  }
+
+
+  // ----------------------------------------------------------
+  // Get the current action number.
+  //
+  // AI Dungeon provides info.actionCount.
+  //
+  // The fallback makes Script Test and unusual environments
+  // less likely to cause problems.
+  // ----------------------------------------------------------
+
+  const turn =
+    (
+      typeof info !== "undefined" &&
+      info &&
+      Number.isFinite(
+        Number(
+          info.actionCount
+        )
+      )
+    )
+      ? Number(
+          info.actionCount
+        )
+      : (
+          Array.isArray(history)
+            ? history.length
+            : 0
+        );
+
+
+  // ----------------------------------------------------------
+  // Give the player's input to the shared engine.
+  //
+  // The engine itself does all of the location detection and
+  // state management.
+  // ----------------------------------------------------------
+
+  NPCSpawn.handleInput(
+    String(text || ""),
+    state,
+    history,
+    turn
+  );
+
+
+  // ----------------------------------------------------------
+  // IMPORTANT:
+  //
+  // We return the player's ORIGINAL input unchanged.
+  //
+  // This script is only observing the input and updating the
+  // hidden state.
+  // ----------------------------------------------------------
+
+  return {
+    text
+  };
+};
+
+
+// DO NOT REMOVE THIS LINE.
+// AI Dungeon requires modifier(text) in non-Library hooks.
+modifier(text);
